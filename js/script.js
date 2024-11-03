@@ -90,7 +90,7 @@ async function getMealDetails(id) {
     showLoading();
     const response = await fetchData(`/lookup.php?i=${id}`);
     hideLoading();
-    if (response?.meals?.[0]) {
+    if (response?.meals?.[0]) { // if response is not empty && response.meals is not null
         displayMealDetails(response.meals[0]);
     }
 }
