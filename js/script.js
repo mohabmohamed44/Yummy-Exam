@@ -1,107 +1,113 @@
-window.onload = function() {
-    $("loading-screen").fadeOut(10000);
-    getData();
+// Constants and State
+const api_base_url = 'https://www.themealdb.com/api/json/v1/1';
+const loading_screen = $('.loading-screen');
+const side_nav_menu = $('.side-nav-menu');
+const nav_header = $('.nav-header');
+const row_data = $('#rowData');
+
+// Loading state management
+const showLoading = () => {
+    loading_screen.removeClass('d-none');
+    side_nav_menu.addClass('d-none');
+    nav_header.animate({left:'80px'}, 300);
+};
+
+const hideLoading = () => {
+    loading_screen.addClass('d-none');
+    side_nav_menu.removeClass('d-none');
+    nav_header.animate({left:'0px'}, 300);
+};
+
+// API Calls
+async function fetchData(endpoint) {
+    try {
+        const response = await fetch(`${api_base_url}${endpoint}`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        return null;
+    }
 }
+
+// Initial Load
+window.onload = async function() {
+    $("#loading-screen").fadeOut(1000);
+    await getData();
+};
 
 async function getData() {
-    $('.loading-screen').removeClass('d-none');
-    $('.side-nav-menu').addClass('d-none');
-    $('.nav-header').animate({left:'80px'},300);
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=`);
-    let response = await result.json();
-    $('.loading-screen').addClass('d-none');
-    $('.side-nav-menu').removeClass('d-none');
-    $('.nav-header').animate({left:'0px'},300);
-    displayData(response.meals);
-}
-// open SideBar
-$('.open-close-btn').click(function(){
-    let widths = $('.nav-tab').outerWidth();
-    let offset = $('.side-nav-menu').offset().left;
-        if(offset === 0){
-            $('.side-nav-menu').css({left:`-${widths}px` , transition: 'all 1s'});
-            $(".open-close-icon").removeClass("fa-x");
-            $(".open-close-icon").addClass("fa-align-justify");
-            $('.list-unstyled li').animate({top:300 },500)
-        }else {
-            $('.side-nav-menu').css({left:0 , transition: 'all 1s'});
-            $(".open-close-icon").removeClass("fa-align-justify");
-            $(".open-close-icon").addClass("fa-x");
-            $('.list-unstyled li').animate({top:0 },1000);
-        }
-});
-
-// close SideBar
-function closeSideBar() {
-    $('.side-nav-menu').toggleClass('show');
-    $('.nav-header').toggleClass('show');
-    $('.open-close-icon').toggleClass('rotate');
-    if ($('.side-nav-menu').hasClass('show')) {
-        $('.side-nav-menu').animate({left:'0px'},300);
-    } else {
-        $('.side-nav-menu').animate({left:'-256.562px'},300);
+    showLoading();
+    const response = await fetchData('/search.php?s=');
+    hideLoading();
+    if (response?.meals) {
+        displayData(response.meals);
     }
 }
-// display data in grid
-async function displayData(data) {
-    let box=``;
-    for(i=0 ; i< data.length ; i++){
-        box += `
+
+// Sidebar Management
+class Sidebar {
+    static toggle() {
+        const width = $('.nav-tab').outerWidth();
+        const offset = $('.side-nav-menu').offset().left;
+        const icon = $(".open-close-icon");
+        
+        if (offset === 0) {
+            $('.side-nav-menu').css({left: `-${width}px`, transition: 'all 0.5s'}); 
+            icon.removeClass("fa-x").addClass("fa-align-justify");
+            $('.list-unstyled li').animate({top: 300}, 500);
+        } else {
+            $('.side-nav-menu').css({left: 0, transition: 'all 0.5s'}); 
+            icon.removeClass("fa-align-justify").addClass("fa-x");
+            $('.list-unstyled li').animate({top: 0}, 500); 
+        }
+    }
+}
+
+// Event Listeners
+$('.open-close-btn').click(Sidebar.toggle);
+
+// Display Functions
+function displayData(data) {
+    if (!Array.isArray(data)) return;
+    
+    const meals = data.map(meal => `
         <div class="col-md-3 hidenDiv">
-                <div onclick="getMealDetails('${data[i].idMeal}')" class="meal overflow-hidden rounded-2 cursor-pointer">
-                    <img class="w-100" src="${data[i].strMealThumb}" alt="" srcset="">
-                    <div class="meal-layer position-absolute d-flex align-items-center text-black p-2 ">
-                        <h3>${data[i].strMeal}</h3>
-                    </div>
+            <div onclick="getMealDetails('${meal.idMeal}')" class="meal overflow-hidden rounded-2 cursor-pointer">
+                <img class="w-100" src="${meal.strMealThumb}" alt="${meal.strMeal}">
+                <div class="meal-layer position-absolute d-flex align-items-center text-black p-2">
+                    <h3>${meal.strMeal}</h3>
                 </div>
+            </div>
         </div>
-        `
+    `).join('');
+    
+    row_data.html(meals);
+}
+
+// Meal Details
+async function getMealDetails(id) {
+    showLoading();
+    const response = await fetchData(`/lookup.php?i=${id}`);
+    hideLoading();
+    if (response?.meals?.[0]) {
+        displayMealDetails(response.meals[0]);
     }
-    document.getElementById("rowData").innerHTML+=box;
-}
-// get details of meal from api
-async function getDetails(id) {
-    $(".loading-screen").removeClass('d-none');
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${id}`);
-    let response = await result.json();
-    displayDetails(response.meals[0]);
 }
 
-async function getMealDetails(id){
-    $('.loading-screen').removeClass('d-none');
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${id}`);
-    let response = await result.json();
-    $('.loading-screen').addClass('d-none');
-    displayMealDetails(response.meals[0]);
-}
+function displayMealDetails(meal) {
+    const ingredients = Array.from({length: 20}, (_, i) => i + 1) // length = 20 => [1, 2, 3, ..., 20]
+        .filter(i => meal[`strIngredient${i}`])
+        .map(i => `<li class="alert alert-info m-2 p-1">${meal[`strMeasure${i}`]} ${meal[`strIngredient${i}`]}</li>`)
+        .join('');
 
-async function displayMealDetails(meal){
-    closeSideBar()
-    // loop and add on li ingredient list 
-    let ingredients = ``;
-    for (let i = 1; i <= 20; i++) {
-        if (meal[`strIngredient${i}`]) {
-            ingredients += `<li class="alert alert-info m-2 p-1">${meal[`strMeasure${i}`]} ${meal[`strIngredient${i}`]}</li>`
-        }
-    }
-
-
-    // if the tag loop not found result 
-    let tags = meal.strTags?.split(",");
-    if (!tags) tags = [];
-
-
-    // loop and add on li tags list
-    let tagsStr = '' ;
-    for (let i = 0; i < tags.length; i++) {
-        tagsStr += `<li class="alert alert-danger m-2 p-1">${tags[i]}</li>`
-    } ;
-
+    const tags = meal.strTags?.split(",") || [];
+    const tagsStr = tags.map(tag => `<li class="alert alert-danger m-2 p-1">${tag}</li>`).join('');
 
     $('.hidenDiv').addClass('d-none');
-    box = `
+    const details = `
         <div class="col-md-4 hidenDiv">
-            <img class="w-100 rounded-3" src="${meal.strMealThumb}" alt="meal-photo"/>
+            <img class="w-100 rounded-3" src="${meal.strMealThumb}" alt="${meal.strMeal}">
             <h2>${meal.strMeal}</h2>
         </div>
         <div class="col-md-8 hidenDiv">
@@ -109,382 +115,342 @@ async function displayMealDetails(meal){
             <p>${meal.strInstructions}</p>
             <h3>Area: <span class="fw-bolder">${meal.strArea}</span></h3>
             <h3>Category: <span class="fw-bolder">${meal.strCategory}</span></h3>
-            <h3>Recipes: </h3>
+            <h3>Recipes:</h3>
             <ul class="list-unstyled d-flex g-3 flex-wrap">${ingredients}</ul>
-            <h3>Tags: </h3>
+            <h3>Tags:</h3>
             <ul class="list-unstyled d-flex g-3 flex-wrap">${tagsStr}</ul>
             <a target="_blank" href="${meal.strSource}" class="btn btn-success">Source</a>
             <a target="_blank" href="${meal.strYoutube}" class="btn btn-danger">Youtube</a>
-        </div>`
-    document.getElementById("rowData").innerHTML+=box;
-}
-
-
-// SearchPage()
-
-async function SearchPage() {
-    $('.hidenDiv').addClass('d-none');
-
-    // Create the container div
-    let $box = $('<div>', { class: 'hidenDiv row py-4' });
-
-    // Create the first input element
-    let $inputOne = $('<input>', {
-        id: 'inputone',
-        class: 'form-control form-controlOne bg-transparent text-white',
-        type: 'text',
-        placeholder: 'Search By Name',
-        onchange: 'dis()',
-        onkeyup: 'searchByName(this.value)'
-    });
-
-    // Append the first input to its column div, then append to the container
-    $('<div>', { class: 'col-md-6' }).append($inputOne).appendTo($box);
-
-    // Create the second input element
-    let $inputTwo = $('<input>', {
-        id: 'inputtwo',
-        class: 'form-control bg-transparent text-white',
-        type: 'text',
-        placeholder: 'Search By First Letter',
-        maxlength: 1,
-        onkeyup: 'searchByFLetter(this.value)'
-    });
-
-    // append the second input to its column div, then append to the container
-    $('<div>', { class: 'col-md-6' }).append($inputTwo).appendTo($box);
-
-    // append the container div to the main container
-    $('#searchContainer').append($box);
-}
-
-
-
-
-// search by name and show data from the api
-async function searchByName(name) {
-    closeSideBar();
-    $(".loading-screen").removeClass('d-none');
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${name}`);
-    document.getElementById("rowData").innerHTML = "";
-    let response = await result.json();
-    displayData(response.meals);
-    $(".loading-screen").addClass('d-none');
-}
-
-
-
-// search by first letter and show data from the api
-async function searchByFLetter(letter) {
-    $(".loading-screen").removeClass('d-none');
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?f=${letter}`);
-    document.getElementById("rowData").innerHTML = "";
-    letter == "" ? letter = "-" + letter : letter;
-    let response = await result.json();
-    displayData(response.meals);
-    $(".loading-screen").addClass('d-none');
-}
-
-
-// display categoryMeals
-async function getCategoryOneMeal(category) {
-    $(".loading-screen").removeClass('d-none');
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?c=${category}`);
-    let response = await result.json();
-    displayCategoryMeals(response.meals);
-    $(".loading-screen").addClass('d-none');
-}
-
-async function getCategoryMeals(){
-    $('.loading-screen').removeClass('d-none');
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/categories.php`);
-    let response = await result.json();
-    $('.loading-screen').addClass('d-none');
-    displayCategoryMeals(response.categories);
-}
-
-async function displayCategoryMeals(categories) {
-    $('.hidenDiv').addClass('d-none');
-
-    for (let i = 0; i < categories.length; i++) {
-        // Create the main category div
-        let $categoryDiv = $('<div>', { class: 'hidenDiv col-md-3 position-relative' });
-
-        // Create the clickable meal div
-        let $mealDiv = $('<div>', {
-            class: 'meal position-relative overflow-hidden rounded-2 cursor-pointer',
-            onclick: `getCategoryOneMeal('${categories[i].strCategory}')`
-        });
-
-        // Create and append the image
-        let $img = $('<img>', {
-            class: 'w-100',
-            src: categories[i].strCategoryThumb,
-            alt: ''
-        });
-        $mealDiv.append($img);
-
-        // Create the overlay layer
-        let $mealLayer = $('<div>', {
-            class: 'meal-layer position-absolute text-center text-black p-2'
-        });
-
-        
-        $mealLayer.append($('<h3>').text(categories[i].strCategory));
-        $mealLayer.append($('<p>').text(categories[i].strCategoryDescription));
-
-        
-        $mealDiv.append($mealLayer);
-        $categoryDiv.append($mealDiv);
-
-        
-        $('#rowData').append($categoryDiv);
-    }
-}
-
-
-// get Category of one meal
-async function getCategoryOneMeal(category) {
-    $(".loading-screen").removeClass('d-none');
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?c=${category}`);
-    let response = await result.json();
-    getCategoryOneMeal(response.meals);
-    $(".loading-screen").addClass('d-none');
-}
-
-
-// display area
-async function getArea() {
-    $(".loading-screen").removeClass('d-none');
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/list.php?a=list`);
-    let response = await result.json();
-    displayArea(response.meals);
-    $(".loading-screen").addClass('d-none');
-}
-
-async function displayAreas(data){
-    $('.hidenDiv').addClass('d-none');
-    let box=``;
-    for(i=0 ; i< data.length ; i++){
-        box += `
-        <div class="col-md-3 hidenDiv">
-            <div onclick="getAreaOneMeal('${data[i].strArea}')" class="rounded-2 text-center cursor-pointer" >
-                <i class="fa-solid fa-house-laptop fa-4x"></i>
-                <h3>${data[i].strArea}</h3>
-            </div>
-        </div>
-        `
-    }
-    document.getElementById("rowData").innerHTML+=box;
-}
-
-
-// get ingradiants
-async function getIngradiants() {
-    $(".loading-screen").removeClass('d-none');
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/list.php?i=list`);
-    let response = await result.json();
-    displayIngradiants(response.meals);
-    $(".loading-screen").addClass('d-none');
-}
-
-// display ingradiants
-async function displayIngradiants(ingradiants) {
-    $('.hidenDiv').addClass('d-none');
-
-    for (let i = 0; i < ingradiants.length; i++) {
-        // Create the main category div
-        let $categoryDiv = $('<div>', { class: 'hidenDiv col-md-3 position-relative' });
-
-        // Create the clickable meal div
-        let $mealDiv = $('<div>', {
-            class: 'meal-div position-relative text-center text-white p-2',
-            onclick: `getCategoryOneMeal('${ingradiants[i].strIngredient}')`
-        });
-
-        // Create and append the image
-        let $mealLayer = $('<div>', { class: 'meal-layer' });
-        $mealLayer.append($('<img>').attr('src', `https://www.themealdb.com/images/ingredients/${ingradiants[i].strIngredient}-Small.png`));
-
-        // Create the overlay layer
-        $mealDiv.append($mealLayer);
-        $categoryDiv.append($mealDiv);
-
-        $('#rowData').append($categoryDiv);
-
-
-        // Create the main category div
-        let $categoryDivTwo = $('<div>', { class: 'hidenDiv col-md-3 position-relative' });
-        // Create the clickable meal div
-        let $mealDivTwo = $('<div>', {
-            class: 'meal-div position-relative text-center text-white p-2',
-            onclick: `getCategoryOneMeal('${ingradiants[i].strIngredient}')`
-        });
-
-        // Create and append the image
-        let $mealLayerTwo = $('<div>', { class: 'meal-layer' });
-        $mealLayerTwo.append($('<img>').attr('src', `https://www.themealdb.com/images/ingredients/${ingradiants[i].strIngredient}-Small.png`));
-
-        // Create the overlay layer
-        $mealDivTwo.append($mealLayerTwo);
-        $categoryDivTwo.append($mealDivTwo);
-
-        $('#rowDataTwo').append($categoryDivTwo);
-    }
-}
-
-
-// get one ingradiant from api
-async function getOneIngradiant(ingradiant) {
-    $(".loading-screen").removeClass('d-none');
-    let result = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?i=${ingradiant}`);
-    let response = await result.json();
-    displayOneMeal(response.meals.splice(0, 20)); // display 20 meals
-    $(".loading-screen").addClass('d-none');
-}
-
-// display one meal
-async function displayOneMeal(meals) {
-    $('.hidenDiv').addClass('d-none');
+        </div>`;
     
-    for (let i = 0; i < meals.length; i++) {
-        // Create the main container div for each meal
-        let $mealContainer = $('<div>', { class: 'col-md-3 hidenDiv' });
-
-        // Create the clickable meal div
-        let $mealDiv = $('<div>', {
-            class: 'meal overflow-hidden rounded-2 cursor-pointer',
-            onclick: `getMealDetails('${meals[i].idMeal}')`
-        });
-
-        // Create and append the image
-        let $img = $('<img>', {
-            class: 'w-100',
-            src: meals[i].strMealThumb,
-            alt: ''
-        });
-        $mealDiv.append($img);
-
-        // Create the overlay layer for the meal name
-        let $mealLayer = $('<div>', {
-            class: 'meal-layer position-absolute d-flex align-items-center text-black p-2'
-        });
-
-        // Add the meal name inside the overlay
-        $mealLayer.append($('<h3>').text(meals[i].strMeal));
-
-        // Append the overlay to the meal div, and then the meal div to the main container
-        $mealDiv.append($mealLayer);
-        $mealContainer.append($mealDiv);
-
-        // Append the main container to the rowData element
-        $('#rowData').append($mealContainer);
-    }
+    row_data.html(details);
 }
 
-// regex for validating inputs of contact us page
-const nameValidation = () => /^[a-zA-Z ]+$/.test(document.getElementById("nameInput").value);
-
-const emailValidation = () => (/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(document.getElementById("emailInput").value));
-
-const phoneValidation = () => /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/.test(document.getElementById("phoneInput").value);
-
-const ageValidation = () => /^(0?[1-9]|[1-9][0-9]|[1][1-9][1-9]|200)$/.test(document.getElementById("ageInput").value);
-
-const passwordValidation = () => /^(?=.*\d)(?=.*[a-z])[0-9a-zA-Z]{8,}$/.test(document.getElementById("passwordInput").value);
-
-const resetPasswordValidation = () => document.getElementById("repasswordInput").value == document.getElementById("passwordInput").value;
-
-
-
-
-
-
-
-async function contactUsPage() {
-    $('.hidenDiv').addClass('d-none');
-
-    // Main container div for contact us form
-    const mainDiv = document.createElement('div');
-    mainDiv.className = 'hidenDiv contact min-vh-100 d-flex justify-content-center align-items-center';
-
-    const container = document.createElement('div');
-    container.className = 'container w-75 text-center';
-
-    const row = document.createElement('div');
-    row.className = 'row g-4';
-
-    // Function to create input and alert div
-    const createInputField = (id, type, placeholder, alertText) => {
-        const colDiv = document.createElement('div');
-        colDiv.className = 'col-md-6';
-
-        const input = document.createElement('input');
-        input.id = id;
-        input.type = type;
-        input.className = 'selectedInput form-control';
-        input.placeholder = placeholder;
-        input.addEventListener('keyup', inputsValidation);
-
-        const alertDiv = document.createElement('div');
-        alertDiv.id = `${id}Alert`;
-        alertDiv.className = 'alert alert-danger w-100 mt-2 d-none';
-        alertDiv.textContent = alertText;
-
-        colDiv.appendChild(input);
-        colDiv.appendChild(alertDiv);
-
-        return colDiv;
+// Form Validation
+class FormValidator {
+    static validators = {
+        name: {
+            regex: /^[a-zA-Z\s]{3,30}$/,
+            message: 'Name must be between 3-30 characters'
+        },
+        email: {
+            regex: /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+            message: 'Enter a valid email address'
+        },
+        phone: {
+            regex: /^01[0125][0-9]{8}$/,
+            message: 'Enter a valid Egyptian phone number'
+        },
+        age: {
+            validate: (value) => {
+                const age = parseInt(value);
+                return age >= 18 && age <= 80;
+            },
+            message: 'Age must be between 18-80 years'
+        },
+        password: {
+            regex: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/,
+            message: 'Password must be at least 8 characters with letters and numbers'
+        }
     };
 
-    // Append each input field to the row
-    row.appendChild(createInputField('nameInput', 'text', 'Enter Your Name', 'Special characters and numbers not allowed'));
-    row.appendChild(createInputField('emailInput', 'email', 'Enter Your Email', 'Email not valid *example@yyy.zzz'));
-    row.appendChild(createInputField('phoneInput', 'text', 'Enter Your Phone', 'Enter valid phone Number'));
-    row.appendChild(createInputField('ageInput', 'number', 'Enter Your Age', 'Enter valid age'));
-    row.appendChild(createInputField('passwordInput', 'password', 'Enter Your Password', 'Enter valid password *Minimum eight characters, at least one letter and one number*'));
-    row.appendChild(createInputField('repasswordInput', 'password', 'Repassword', 'Enter valid repassword'));
-
-    // Create and add submit button
-    const submitBtn = document.createElement('button');
-    submitBtn.className = 'btn btn-outline-danger px-2 mt-3';
-    submitBtn.id = 'submitBtn';
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Submit';
-
-    // Add button to container
-    container.appendChild(row);
-    container.appendChild(submitBtn);
-    mainDiv.appendChild(container);
-    document.getElementById('rowData').appendChild(mainDiv);
-
-    // Add focus event listeners to track if input fields have been touched
-    const inputs = ['nameInput', 'emailInput', 'phoneInput', 'ageInput', 'passwordInput', 'repasswordInput'];
-    inputs.forEach(id => {
-        document.getElementById(id).addEventListener('focus', () => {
-            window[`${id}Touched`] = true;
-        }); // track if input fields have been touched
-    }); // add focus event listeners
-}
-
-
-function inputsValidation() {
-    const inputs = ['nameInput', 'emailInput', 'phoneInput', 'ageInput', 'passwordInput', 'repasswordInput'];
-    inputs.forEach(id => {
-        if (!window[`${id}Touched`]) {
-            document.getElementById(`${id}Alert`).classList.replace('d-none', 'd-block');
-            document.getElementById(`${id}Alert`).classList.add('is-invalid');
-            document.getElementById(`${id}Alert`).classList.remove('is-valid');
-        } else {
-            document.getElementById(`${id}Alert`).classList.replace('d-block', 'd-none');
-            document.getElementById(`${id}Alert`).classList.add('is-valid');
-            document.getElementById(`${id}Alert`).classList.remove('is-invalid');
+    static validateField(fieldName, value, compareValue = null) {
+        const validator = this.validators[fieldName];
+        const input = $(`#${fieldName}Input`);
+        const alert = $(`#${fieldName}InputAlert`);
+        
+        let isValid = false;
+        
+        if (fieldName === 'repassword') {
+            isValid = value === compareValue && value !== '';
+        } else if (validator.regex) {
+            isValid = validator.regex.test(value);
+        } else if (validator.validate) {
+            isValid = validator.validate(value);
         }
-    });
 
-    if (nameValidation() && emailValidation() && phoneValidation() && ageValidation() && passwordValidation() && repasswordValidation()) {
-        document.getElementById('submitBtn').disabled = false;
-    } else {
-        document.getElementById('submitBtn').disabled = true;
+        input.toggleClass('is-valid', isValid).toggleClass('is-invalid', !isValid);
+        alert.toggleClass('d-none', isValid).toggleClass('d-block', !isValid);
+        
+        return isValid;
+    }
+
+    static setupValidation() {
+        const fields = ['name', 'email', 'phone', 'age', 'password', 'repassword'];
+        
+        fields.forEach(field => {
+            $(`#${field}Input`).on('input', function() {
+                const value = $(this).val();
+                const compareValue = field === 'repassword' ? $('#passwordInput').val() : null;
+                FormValidator.validateField(field, value, compareValue);
+                FormValidator.updateSubmitButton();
+            });
+        });
+    }
+
+    static updateSubmitButton() {
+        const allValid = ['name', 'email', 'phone', 'age', 'password', 'repassword']
+            .every(field => $(`#${field}Input`).hasClass('is-valid'));
+        
+        $('#submitBtn').prop('disabled', !allValid);
     }
 }
+
+// Initialize form validation
+$(document).ready(FormValidator.setupValidation);
+
+
+
+// Search Functionality
+async function setupSearchPage() {
+    $('.hidenDiv').addClass('d-none');
+
+    const searchHTML = `
+        <div class="hidenDiv row py-4">
+            <div class="col-md-6">
+                <input id="searchByName" 
+                       class="form-control bg-transparent text-white" 
+                       type="text" 
+                       placeholder="Search By Name"
+                       autocomplete="off">
+            </div>
+            <div class="col-md-6">
+                <input id="searchByLetter" 
+                       class="form-control bg-transparent text-white" 
+                       type="text" 
+                       placeholder="Search By First Letter"
+                       maxlength="1"
+                       autocomplete="off">
+            </div>
+        </div>
+    `;
+    $('#searchContainer').html(searchHTML);
+
+    // Event Listeners
+    $('#searchByName').on('input', async function() {
+        await searchByName(this.value);
+    });
+
+    $('#searchByLetter').on('input', async function() {
+        await searchByFirstLetter(this.value);
+    });
+}
+
+async function searchByName(name) {
+    if (!name.trim()) {
+        row_data.empty();
+        return;
+    }
+    
+    showLoading();
+    const response = await fetchData(`/search.php?s=${name}`);
+    hideLoading();
+    
+    if (response?.meals) {
+        displayData(response.meals);
+    } else {
+        row_data.html('<div class="alert alert-info">No meals found</div>');
+    }
+}
+
+async function searchByFirstLetter(letter) {
+    if (!letter) {
+        row_data.empty();
+        return;
+    }
+    
+    showLoading();
+    const response = await fetchData(`/search.php?f=${letter}`);
+    hideLoading();
+    
+    if (response?.meals) {
+        displayData(response.meals);
+    } else {
+        row_data.html('<div class="alert alert-info">No meals found</div>');
+    }
+}
+
+// Categories Functionality
+async function getCategories() {
+    showLoading();
+    const response = await fetchData('/categories.php');
+    hideLoading();
+    
+    if (response?.categories) {
+        displayCategories(response.categories);
+    }
+}
+
+function displayCategories(categories) {
+    $('.hidenDiv').addClass('d-none');
+    
+    const categoriesHTML = categories.map(category => `
+        <div class="col-md-3 hidenDiv">
+            <div class="category position-relative overflow-hidden rounded-2 cursor-pointer"
+                 onclick="getCategoryMeals('${category.strCategory}')">
+                <img src="${category.strCategoryThumb}" class="w-100" alt="${category.strCategory}">
+                <div class="category-layer position-absolute text-center text-black p-2">
+                    <h3>${category.strCategory}</h3>
+                    <p>${category.strCategoryDescription.split(' ').slice(0, 20).join(' ')}...</p>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    row_data.html(categoriesHTML);
+}
+
+async function getCategoryMeals(category) {
+    showLoading();
+    const response = await fetchData(`/filter.php?c=${category}`);
+    hideLoading();
+    
+    if (response?.meals) {
+        displayData(response.meals);
+    }
+}
+
+// Area Functionality
+async function getAreas() {
+    showLoading();
+    const response = await fetchData('/list.php?a=list');
+    hideLoading();
+    
+    if (response?.meals) {
+        displayAreas(response.meals);
+    }
+}
+
+function displayAreas(areas) {
+    $('.hidenDiv').addClass('d-none');
+    
+    const areasHTML = areas.map(area => `
+        <div class="col-md-3 hidenDiv">
+            <div class="area text-center cursor-pointer" onclick="getAreaMeals('${area.strArea}')">
+                <i class="fa-solid fa-house-laptop fa-4x"></i>
+                <h3>${area.strArea}</h3>
+            </div>
+        </div>
+    `).join('');
+    
+    row_data.html(areasHTML);
+}
+
+async function getAreaMeals(area) {
+    showLoading();
+    const response = await fetchData(`/filter.php?a=${area}`);
+    hideLoading();
+    
+    if (response?.meals) {
+        displayData(response.meals);
+    }
+}
+
+// Ingredients Functionality
+async function getIngredients() {
+    showLoading();
+    const response = await fetchData('/list.php?i=list');
+    hideLoading();
+    
+    if (response?.meals) {
+        displayIngredients(response.meals.slice(0, 20)); // Display only first 20 ingredients
+    }
+}
+
+function displayIngredients(ingredients) {
+    $('.hidenDiv').addClass('d-none');
+    
+    const ingredientsHTML = ingredients.map(ingredient => `
+        <div class="col-md-3 hidenDiv">
+            <div class="ingredient text-center cursor-pointer" 
+                 onclick="getIngredientMeals('${ingredient.strIngredient}')">
+                <i class="fa-solid fa-drumstick-bite fa-4x"></i>
+                <h3>${ingredient.strIngredient}</h3>
+                <p>${ingredient.strDescription ? 
+                     ingredient.strDescription.split(' ').slice(0, 20).join(' ') + '...' : 
+                     ''}</p>
+            </div>
+        </div>
+    `).join('');
+    
+    row_data.html(ingredientsHTML);
+}
+
+async function getIngredientMeals(ingredient) {
+    showLoading();
+    const response = await fetchData(`/filter.php?i=${ingredient}`);
+    hideLoading();
+    
+    if (response?.meals) {
+        displayData(response.meals.slice(0, 20)); // Display only first 20 meals
+    }
+}
+
+// Contact Form
+function displayContactForm() {
+    $('.hidenDiv').addClass('d-none');
+    
+    const formHTML = `
+        <div class="contact min-vh-100 d-flex justify-content-center align-items-center">
+            <div class="container w-75 text-center">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <input id="nameInput" type="text" class="form-control" placeholder="Enter Your Name">
+                        <div id="nameInputAlert" class="alert alert-danger w-100 mt-2 d-none">
+                            Name must be between 3-30 characters
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <input id="emailInput" type="email" class="form-control" placeholder="Enter Your Email">
+                        <div id="emailInputAlert" class="alert alert-danger w-100 mt-2 d-none">
+                            Enter a valid email address
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <input id="phoneInput" type="text" class="form-control" placeholder="Enter Your Phone">
+                        <div id="phoneInputAlert" class="alert alert-danger w-100 mt-2 d-none">
+                            Enter a valid phone number
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <input id="ageInput" type="number" class="form-control" placeholder="Enter Your Age">
+                        <div id="ageInputAlert" class="alert alert-danger w-100 mt-2 d-none">
+                            Age must be between 18-80 years
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <input id="passwordInput" type="password" class="form-control" placeholder="Enter Your Password">
+                        <div id="passwordInputAlert" class="alert alert-danger w-100 mt-2 d-none">
+                            Password must be at least 8 characters with letters and numbers
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <input id="repasswordInput" type="password" class="form-control" placeholder="Reenter Your Password">
+                        <div id="repasswordInputAlert" class="alert alert-danger w-100 mt-2 d-none">
+                            Passwords don't match
+                        </div>
+                    </div>
+                    <button id="submitBtn" class="btn btn-outline-danger px-2 mt-3" disabled>Submit</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    row_data.html(formHTML);
+    FormValidator.setupValidation();
+}
+
+// Navigation Event Listeners
+function setupNavigation() {
+    $('#searchLink').click(setupSearchPage);
+    $('#categoriesLink').click(getCategories);
+    $('#areaLink').click(getAreas);
+    $('#ingredientsLink').click(getIngredients);
+    $('#contactLink').click(displayContactForm);
+}
+
+// Initialize the application
+$(document).ready(function() {
+    setupNavigation();
+    getData(); // Load initial data
+});
