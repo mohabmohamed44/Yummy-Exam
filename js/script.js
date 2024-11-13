@@ -45,6 +45,15 @@ async function getData() {
     }
 }
 
+// function to close sideNav
+function closeSideNav() {
+    const width = $('.nav-tab').outerWidth();
+    $('.side-nav-menu').css({left: `-${width}px`, transition: 'all 0.5s'}); 
+    $('.open-close-icon').removeClass("fa-x").addClass("fa-align-justify");
+    $('.list-unstyled li').animate({top: 300}, 500);
+}
+
+
 // Sidebar Management
 class Sidebar {
     static toggle() {
@@ -87,6 +96,7 @@ function displayData(data) {
 
 // Meal Details
 async function getMealDetails(id) {
+    closeSideNav();
     showLoading();
     const response = await fetchData(`/lookup.php?i=${id}`);
     hideLoading();
@@ -96,6 +106,7 @@ async function getMealDetails(id) {
 }
 
 function displayMealDetails(meal) {
+    closeSideNav();
     const ingredients = Array.from({length: 20}, (_, i) => i + 1) // length = 20 => [1, 2, 3, ..., 20]
         .filter(i => meal[`strIngredient${i}`])
         .map(i => `<li class="alert alert-info m-2 p-1">${meal[`strMeasure${i}`]} ${meal[`strIngredient${i}`]}</li>`)
@@ -203,6 +214,7 @@ $(document).ready(FormValidator.setupValidation);
 
 // Search Functionality
 async function setupSearchPage() {
+    closeSideNav();
     $('.hidenDiv').addClass('d-none');
 
     const searchHTML = `
@@ -272,6 +284,7 @@ async function searchByFirstLetter(letter) {
 
 // Categories Functionality
 async function getCategories() {
+    closeSideNav();
     showLoading();
     const response = await fetchData('/categories.php');
     hideLoading();
@@ -282,6 +295,7 @@ async function getCategories() {
 }
 
 function displayCategories(categories) {
+    closeSideNav();
     $('.hidenDiv').addClass('d-none');
     
     const categoriesHTML = categories.map(category => `
@@ -301,6 +315,7 @@ function displayCategories(categories) {
 }
 
 async function getCategoryMeals(category) {
+    closeSideNav();
     showLoading();
     const response = await fetchData(`/filter.php?c=${category}`);
     hideLoading();
@@ -312,6 +327,7 @@ async function getCategoryMeals(category) {
 
 // Area Functionality
 async function getAreas() {
+    closeSideNav();
     showLoading();
     const response = await fetchData('/list.php?a=list');
     hideLoading();
@@ -322,6 +338,7 @@ async function getAreas() {
 }
 
 function displayAreas(areas) {
+    closeSideNav();
     $('.hidenDiv').addClass('d-none');
     
     const areasHTML = areas.map(area => `
@@ -337,6 +354,7 @@ function displayAreas(areas) {
 }
 
 async function getAreaMeals(area) {
+    closeSideNav();
     showLoading();
     const response = await fetchData(`/filter.php?a=${area}`);
     hideLoading();
@@ -348,6 +366,7 @@ async function getAreaMeals(area) {
 
 // Ingredients Functionality
 async function getIngredients() {
+    closeSideNav();
     showLoading();
     const response = await fetchData('/list.php?i=list');
     hideLoading();
@@ -358,6 +377,7 @@ async function getIngredients() {
 }
 
 function displayIngredients(ingredients) {
+    closeSideNav();
     $('.hidenDiv').addClass('d-none');
     
     const ingredientsHTML = ingredients.map(ingredient => `
@@ -377,6 +397,7 @@ function displayIngredients(ingredients) {
 }
 
 async function getIngredientMeals(ingredient) {
+    closeSideNav();
     showLoading();
     const response = await fetchData(`/filter.php?i=${ingredient}`);
     hideLoading();
@@ -388,6 +409,7 @@ async function getIngredientMeals(ingredient) {
 
 // Contact Form
 function displayContactForm() {
+    closeSideNav();
     $('.hidenDiv').addClass('d-none');
     
     const formHTML = `
